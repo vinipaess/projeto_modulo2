@@ -1,0 +1,141 @@
+<?php
+session_start();
+
+function logAction($action)
+{
+    $timestamp = date('d/m/Y H:i:s');
+    $logEntry = "$timestamp - $action\n";
+    file_put_contents('system.log', $logEntry, FILE_APPEND);
+}
+function loadUsers()
+{
+    return [
+        'admin' => [
+            'login' => 'admin',
+            'password' => '1234'
+        ]
+    ];
+}
+function saveUsers($users)
+{
+    file_put_contents('users.php', '<?php $users = ' . var_export($users, true) . '; ?>');
+}
+function loadVendas()
+{
+    return file_exists('vendas.txt') ? unserialize(file_get_contents('vendas.txt')) : [];
+}
+function saveVendas($vendas)
+{
+    file_put_contents('vendas.txt', serialize($vendas));
+}
+function showMenu()
+{
+    echo "Bem-vindo, {$_SESSION['user']}!\n";
+    echo "Valor Total Obtido nas Vendas: R$ " . number_format(array_sum(array_column(loadVendas(), 'valor')), 2, ',', '.') . "\n";
+    echo "Escolha uma opção:\n";
+    echo "1. Vender\n";
+    echo "2. Cadastrar Novo Usuário\n";
+    echo "3. Verificar Log\n";
+    echo "4. Logout\n";
+    $opcao = trim(fgets(STDIN));
+
+    switch ($opcao) {
+        case 1:
+            sellItem();
+            break;
+        case 2:
+            registerUser();
+            break;
+        case 3:
+            viewLog();
+            break;
+        case 4:
+            logout();
+            break;
+        default:
+            echo "Opção inválida.\n";
+            showMenu();
+    }
+}
+function login()
+{
+    $users = loadUsers();
+
+    echo "Login:\n";
+    echo "Login: ";
+    $login = trim(fgets(STDIN));
+    echo "Senha: ";
+    $password = trim(fgets(STDIN));
+
+    if (isset($users[$login]) && $users[$login]['password'] === $password) {
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user'] = $login;
+        logAction("Usuário $login logado.");
+        showMenu();
+    } else {
+        echo "Login ou senha inválidos. Tente novamente.\n";
+        login();
+    }
+}
+function sellItem()
+{
+    echo "Registrar Venda:\n";
+    echo "Nome do Item: ";
+    $item = trim(fgets(STDIN));
+    echo "Valor da Venda: ";
+    $valor = trim(fgets(STDIN));
+
+    $vendas = loadVendas();
+    $vendas[] = ['item' => $item, 'valor' => $valor];
+    saveVendas($vendas);
+
+    logAction("Venda realizada: Item '$item' no valor de $valor.");
+    echo "Venda registrada com sucesso.\n";
+    showMenu();
+}
+function registerUser()
+{
+    $users = loadUsers();
+
+    echo "Cadastrar Novo Usuário:\n";
+    echo "Login: ";
+    $login = trim(fgets(STDIN));
+    echo "Senha: ";
+    $password = trim(fgets(STDIN));
+
+    if (!isset($users[$login])) {
+        $users[$login] = ['login' => $login, 'password' => $password];
+        saveUsers($users);
+        logAction("Novo usuário cadastrado: $login.");
+        echo "Usuário cadastrado com sucesso.\n";
+    } else {
+        echo "Usuário já existe.\n";
+    }
+    showMenu();
+}
+function viewLog()
+{
+    echo "Log do Sistema:\n";
+    if (file_exists('system.log')) {
+        echo file_get_contents('system.log');
+    } else {
+        echo "Nenhum log disponível.\n";
+    }
+    echo "Pressione Enter para voltar ao menu.";
+    fgets(STDIN);
+    showMenu();
+}
+function logout()
+{
+    if (isset($_SESSION['user'])) {
+        logAction("Usuário {$_SESSION['user']} deslogado.");
+    }
+    session_destroy();
+    echo "Você foi deslogado.\n";
+    login();
+}
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    login();
+} else {
+    showMenu();
+}
